@@ -6,7 +6,7 @@ import { randomBytes } from 'crypto';
 export default () => ({
   about: {
     name: 'safe-client-gateway',
-    version: process.env.APPLICATION_VERSION,
+    version: process.env.APPLICATION_VERSION || 'v1.72.0',
     buildNumber: process.env.APPLICATION_BUILD_NUMBER,
   },
   accounts: {
@@ -146,7 +146,7 @@ export default () => ({
   },
   blockchain: {
     infura: {
-      apiKey: process.env.INFURA_API_KEY,
+      apiKey: process.env.INFURA_API_KEY || '',
     },
   },
   db: {
@@ -318,12 +318,12 @@ export default () => ({
     baseUri:
       process.env.PUSH_NOTIFICATIONS_API_BASE_URI ||
       'https://fcm.googleapis.com/v1/projects',
-    project: process.env.PUSH_NOTIFICATIONS_API_PROJECT,
+    project: process.env.PUSH_NOTIFICATIONS_API_PROJECT || '',
     serviceAccount: {
       clientEmail:
-        process.env.PUSH_NOTIFICATIONS_API_SERVICE_ACCOUNT_CLIENT_EMAIL,
+        process.env.PUSH_NOTIFICATIONS_API_SERVICE_ACCOUNT_CLIENT_EMAIL || '',
       privateKey:
-        process.env.PUSH_NOTIFICATIONS_API_SERVICE_ACCOUNT_PRIVATE_KEY,
+        process.env.PUSH_NOTIFICATIONS_API_SERVICE_ACCOUNT_PRIVATE_KEY || '',
     },
   },
   redis: {
