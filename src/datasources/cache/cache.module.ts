@@ -27,7 +27,7 @@ async function redisClientFactory(
     'redis.disableOfflineQueue',
   );
 
-  const [port, db] = redisPort.split("/").map(Number);
+  const [port, db] = redisPort.split('/').map(Number);
 
   const client: RedisClientType = createClient({
     socket: {
@@ -36,7 +36,7 @@ async function redisClientFactory(
       keepAlive: redisKeepAlive,
       connectTimeout: redisConnectTimeout,
     },
-    database: db ?? 0,
+    database: db ?? undefined,
     username: redisUser,
     password: redisPass,
     disableOfflineQueue: redisDisableOfflineQueue,
