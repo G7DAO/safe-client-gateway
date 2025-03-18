@@ -26,6 +26,9 @@ import { TestPostgresDatabaseModule } from '@/datasources/db/__tests__/test.post
 import { PostgresDatabaseModule } from '@/datasources/db/v1/postgres-database.module';
 import { TestPostgresDatabaseModuleV2 } from '@/datasources/db/v2/test.postgres-database.module';
 import { PostgresDatabaseModuleV2 } from '@/datasources/db/v2/postgres-database.module';
+import { TestTargetedMessagingDatasourceModule } from '@/datasources/targeted-messaging/__tests__/test.targeted-messaging.datasource.module';
+import { TargetedMessagingDatasourceModule } from '@/datasources/targeted-messaging/targeted-messaging.datasource.module';
+import { rawify } from '@/validation/entities/raw.entity';
 
 describe('Safe Apps Controller (Unit)', () => {
   let app: INestApplication<Server>;
@@ -40,6 +43,8 @@ describe('Safe Apps Controller (Unit)', () => {
     })
       .overrideModule(PostgresDatabaseModule)
       .useModule(TestPostgresDatabaseModule)
+      .overrideModule(TargetedMessagingDatasourceModule)
+      .useModule(TestTargetedMessagingDatasourceModule)
       .overrideModule(CacheModule)
       .useModule(TestCacheModule)
       .overrideModule(RequestScopedLoggingModule)
@@ -90,7 +95,10 @@ describe('Safe Apps Controller (Unit)', () => {
       networkService.get.mockImplementation(({ url }) => {
         const getSafeAppsUrl = `${safeConfigUrl}/api/v1/safe-apps/`;
         if (url === getSafeAppsUrl) {
-          return Promise.resolve({ data: safeAppsResponse, status: 200 });
+          return Promise.resolve({
+            data: rawify(safeAppsResponse),
+            status: 200,
+          });
         }
         return Promise.reject(new Error(`Could not match ${url}`));
       });
@@ -111,7 +119,7 @@ describe('Safe Apps Controller (Unit)', () => {
               type: 'DOMAIN_ALLOWLIST',
               value: (
                 safeAppsResponse[0].accessControl as {
-                  value: string[] | null;
+                  value: Array<string> | null;
                   type: SafeAppAccessControlPolicies.DomainAllowlist;
                 }
               ).value,
@@ -120,6 +128,7 @@ describe('Safe Apps Controller (Unit)', () => {
             features: safeAppsResponse[0].features,
             developerWebsite: safeAppsResponse[0].developerWebsite,
             socialProfiles: safeAppsResponse[0].socialProfiles,
+            featured: safeAppsResponse[0].featured,
           },
           {
             id: safeAppsResponse[1].id,
@@ -137,6 +146,7 @@ describe('Safe Apps Controller (Unit)', () => {
             features: safeAppsResponse[1].features,
             developerWebsite: safeAppsResponse[1].developerWebsite,
             socialProfiles: safeAppsResponse[1].socialProfiles,
+            featured: safeAppsResponse[1].featured,
           },
         ]);
     });
@@ -148,7 +158,7 @@ describe('Safe Apps Controller (Unit)', () => {
         const getSafeAppsUrl = `${safeConfigUrl}/api/v1/safe-apps/`;
         if (url === getSafeAppsUrl) {
           return Promise.resolve({
-            data: [
+            data: rawify([
               {
                 ...safeAppsResponse[0],
                 accessControl: {
@@ -156,7 +166,7 @@ describe('Safe Apps Controller (Unit)', () => {
                   value: null,
                 },
               },
-            ],
+            ]),
             status: 200,
           });
         }
@@ -183,6 +193,7 @@ describe('Safe Apps Controller (Unit)', () => {
             features: safeAppsResponse[0].features,
             developerWebsite: safeAppsResponse[0].developerWebsite,
             socialProfiles: safeAppsResponse[0].socialProfiles,
+            featured: safeAppsResponse[0].featured,
           },
         ]);
     });
@@ -208,18 +219,18 @@ describe('Safe Apps Controller (Unit)', () => {
       networkService.get.mockImplementation(({ url }) => {
         const getSafeAppsUrl = `${safeConfigUrl}/api/v1/safe-apps/`;
         if (url === getSafeAppsUrl) {
-          return Promise.resolve({ data: safeAppsResponse, status: 200 });
+          return Promise.resolve({
+            data: rawify(safeAppsResponse),
+            status: 200,
+          });
         }
         return Promise.reject(new Error(`Could not match ${url}`));
       });
 
       await request(app.getHttpServer())
         .get(`/v1/chains/${chain.chainId}/safe-apps`)
-        .expect(500)
-        .expect({
-          statusCode: 500,
-          message: 'Internal server error',
-        });
+        .expect(502)
+        .expect({ statusCode: 502, message: 'Bad gateway' });
     });
   });
 });

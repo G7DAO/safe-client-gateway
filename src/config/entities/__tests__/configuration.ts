@@ -14,6 +14,18 @@ export default (): ReturnType<typeof configuration> => ({
       creationRateLimitPeriodSeconds: faker.number.int(),
       creationRateLimitCalls: faker.number.int(),
     },
+    encryption: {
+      type: faker.string.sample(),
+      awsKms: {
+        algorithm: faker.string.alphanumeric(),
+        keyId: faker.string.uuid(),
+      },
+      local: {
+        algorithm: faker.string.alphanumeric(),
+        key: faker.string.alphanumeric(),
+        iv: faker.string.alphanumeric(),
+      },
+    },
   },
   amqp: {
     url: faker.internet.url({ appendSlash: false }),
@@ -108,7 +120,8 @@ export default (): ReturnType<typeof configuration> => ({
           enabled: true,
           requestCert: true,
           rejectUnauthorized: true,
-          caPath: process.env.POSTGRES_SSL_CA_PATH,
+          caPath:
+            process.env.POSTGRES_SSL_CA_PATH || 'db_config/test/server.crt',
         },
       },
     },
@@ -134,33 +147,38 @@ export default (): ReturnType<typeof configuration> => ({
   },
   express: { jsonLimit: '1mb' },
   features: {
-    richFragments: true,
     email: false,
     zerionBalancesChainIds: ['137'],
-    swapsDecoding: true,
-    twapsDecoding: true,
     debugLogs: false,
     configHooksDebugLogs: false,
-    imitationMapping: false,
     auth: false,
-    confirmationView: false,
-    eventsQueue: false,
     delegatesV2: false,
     counterfactualBalances: false,
     accounts: false,
+    users: false,
     pushNotifications: false,
-    nativeStaking: false,
-    nativeStakingDecoding: false,
-    targetedMessaging: false,
+    hookHttpPostEvent: false,
     improvedAddressPoisoning: false,
   },
   httpClient: { requestTimeout: faker.number.int() },
   locking: {
     baseUri: faker.internet.url({ appendSlash: false }),
+    eligibility: {
+      fingerprintEncryptionKey: faker.string.uuid(),
+      nonEligibleCountryCodes: faker.helpers.multiple(
+        () => faker.location.countryCode(),
+        { count: { min: 1, max: 5 } },
+      ),
+    },
+  },
+  jwt: {
+    issuer: process.env.JWT_TEST_ISSUER || 'dummy-issuer',
+    secret: process.env.JWT_TEST_SECRET || 'dummy-secret',
   },
   log: {
     level: 'debug',
     silent: process.env.LOG_SILENT?.toLowerCase() === 'true',
+    prettyColorize: process.env.LOG_PRETTY_COLORIZE?.toLowerCase() === 'true',
   },
   mappings: {
     imitation: {
@@ -180,6 +198,10 @@ export default (): ReturnType<typeof configuration> => ({
   owners: {
     ownersTtlSeconds: faker.number.int(),
   },
+  portfolio: {
+    baseUri: faker.internet.url({ appendSlash: false }),
+    apiKey: faker.string.hexadecimal({ length: 32 }),
+  },
   pushNotifications: {
     baseUri: faker.internet.url({ appendSlash: false }),
     project: faker.word.noun(),
@@ -189,8 +211,13 @@ export default (): ReturnType<typeof configuration> => ({
     },
   },
   redis: {
+    user: process.env.REDIS_USER,
+    pass: process.env.REDIS_PASS,
     host: process.env.REDIS_HOST || 'localhost',
     port: process.env.REDIS_PORT || '6379',
+    timeout: process.env.REDIS_TIMEOUT || 1 * 1_000, // Milliseconds
+    disableOfflineQueue:
+      process.env.REDIS_DISABLE_OFFLINE_QUEUE?.toString() === 'true',
   },
   relay: {
     baseUri: faker.internet.url({ appendSlash: false }),
@@ -236,6 +263,7 @@ export default (): ReturnType<typeof configuration> => ({
     api: {
       1: faker.internet.url({ appendSlash: false }),
       100: faker.internet.url({ appendSlash: false }),
+      8453: faker.internet.url({ appendSlash: false }),
       42161: faker.internet.url({ appendSlash: false }),
       11155111: faker.internet.url({ appendSlash: false }),
     },

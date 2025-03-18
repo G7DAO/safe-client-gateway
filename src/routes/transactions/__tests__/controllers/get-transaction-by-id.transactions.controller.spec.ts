@@ -44,6 +44,9 @@ import { TestPostgresDatabaseModule } from '@/datasources/db/__tests__/test.post
 import { PostgresDatabaseModule } from '@/datasources/db/v1/postgres-database.module';
 import { PostgresDatabaseModuleV2 } from '@/datasources/db/v2/postgres-database.module';
 import { TestPostgresDatabaseModuleV2 } from '@/datasources/db/v2/test.postgres-database.module';
+import { TestTargetedMessagingDatasourceModule } from '@/datasources/targeted-messaging/__tests__/test.targeted-messaging.datasource.module';
+import { TargetedMessagingDatasourceModule } from '@/datasources/targeted-messaging/targeted-messaging.datasource.module';
+import { rawify } from '@/validation/entities/raw.entity';
 
 describe('Get by id - Transactions Controller (Unit)', () => {
   let app: INestApplication<Server>;
@@ -58,6 +61,8 @@ describe('Get by id - Transactions Controller (Unit)', () => {
     })
       .overrideModule(PostgresDatabaseModule)
       .useModule(TestPostgresDatabaseModule)
+      .overrideModule(TargetedMessagingDatasourceModule)
+      .useModule(TestTargetedMessagingDatasourceModule)
       .overrideModule(CacheModule)
       .useModule(TestCacheModule)
       .overrideModule(RequestScopedLoggingModule)
@@ -118,7 +123,7 @@ describe('Get by id - Transactions Controller (Unit)', () => {
     networkService.get.mockImplementation(({ url }) => {
       switch (url) {
         case getChainUrl:
-          return Promise.resolve({ data: chain, status: 200 });
+          return Promise.resolve({ data: rawify(chain), status: 200 });
         case getModuleTransactionUrl: {
           const error = new NetworkResponseError(
             new URL(getModuleTransactionUrl),
@@ -161,9 +166,9 @@ describe('Get by id - Transactions Controller (Unit)', () => {
     networkService.get.mockImplementation(({ url }) => {
       switch (url) {
         case getChainUrl:
-          return Promise.resolve({ data: chain, status: 200 });
+          return Promise.resolve({ data: rawify(chain), status: 200 });
         case getSafeUrl:
-          return Promise.resolve({ data: safe, status: 200 });
+          return Promise.resolve({ data: rawify(safe), status: 200 });
         case getModuleTransactionUrl: {
           const error = new NetworkResponseError(
             new URL(getModuleTransactionUrl),
@@ -200,7 +205,7 @@ describe('Get by id - Transactions Controller (Unit)', () => {
     const moduleTransaction = moduleTransactionBuilder()
       .with('safe', getAddress(safe.address))
       .with('data', null)
-      .with('value', '0xf')
+      .with('value', '15')
       .with('operation', Operation.CALL)
       .with('isSuccessful', true)
       .build();
@@ -212,18 +217,18 @@ describe('Get by id - Transactions Controller (Unit)', () => {
     networkService.get.mockImplementation(({ url }) => {
       switch (url) {
         case getChainUrl:
-          return Promise.resolve({ data: chain, status: 200 });
+          return Promise.resolve({ data: rawify(chain), status: 200 });
         case getModuleTransactionUrl:
           return Promise.resolve({
-            data: moduleTransactionToJson(moduleTransaction),
+            data: rawify(moduleTransactionToJson(moduleTransaction)),
             status: 200,
           });
         case getSafeUrl:
-          return Promise.resolve({ data: safe, status: 200 });
+          return Promise.resolve({ data: rawify(safe), status: 200 });
         case getContractUrl:
-          return Promise.resolve({ data: contract, status: 200 });
+          return Promise.resolve({ data: rawify(contract), status: 200 });
         case getModuleContractUrl:
-          return Promise.resolve({ data: contract, status: 200 });
+          return Promise.resolve({ data: rawify(contract), status: 200 });
         default:
           return Promise.reject(new Error(`Could not match ${url}`));
       }
@@ -250,7 +255,6 @@ describe('Get by id - Transactions Controller (Unit)', () => {
               value: moduleTransaction.value,
             },
             humanDescription: null,
-            richDecodedInfo: null,
           },
           txData: {
             to: expect.objectContaining({ value: contract.address }),
@@ -267,6 +271,7 @@ describe('Get by id - Transactions Controller (Unit)', () => {
           },
           txHash: moduleTransaction.transactionHash,
           safeAppInfo: null,
+          note: null,
         });
       });
   });
@@ -282,9 +287,9 @@ describe('Get by id - Transactions Controller (Unit)', () => {
     networkService.get.mockImplementation(({ url }) => {
       switch (url) {
         case getChainUrl:
-          return Promise.resolve({ data: chain, status: 200 });
+          return Promise.resolve({ data: rawify(chain), status: 200 });
         case getSafeUrl:
-          return Promise.resolve({ data: safe, status: 200 });
+          return Promise.resolve({ data: rawify(safe), status: 200 });
         case getTransferUrl: {
           const error = new NetworkResponseError(new URL(getTransferUrl), {
             status: 404,
@@ -325,18 +330,18 @@ describe('Get by id - Transactions Controller (Unit)', () => {
     networkService.get.mockImplementation(({ url }) => {
       switch (url) {
         case getChainUrl:
-          return Promise.resolve({ data: chain, status: 200 });
+          return Promise.resolve({ data: rawify(chain), status: 200 });
         case getTransferUrl:
           return Promise.resolve({
-            data: nativeTokenTransferToJson(transfer),
+            data: rawify(nativeTokenTransferToJson(transfer)),
             status: 200,
           });
         case getSafeUrl:
-          return Promise.resolve({ data: safe, status: 200 });
+          return Promise.resolve({ data: rawify(safe), status: 200 });
         case getFromContractUrl:
-          return Promise.resolve({ data: contract, status: 200 });
+          return Promise.resolve({ data: rawify(contract), status: 200 });
         case getToContractUrl:
-          return Promise.resolve({ data: contract, status: 200 });
+          return Promise.resolve({ data: rawify(contract), status: 200 });
         default:
           return Promise.reject(new Error(`Could not match ${url}`));
       }
@@ -367,6 +372,7 @@ describe('Get by id - Transactions Controller (Unit)', () => {
           detailedExecutionInfo: null,
           txHash: transfer.transactionHash,
           safeAppInfo: null,
+          note: null,
         });
       });
   });
@@ -382,9 +388,9 @@ describe('Get by id - Transactions Controller (Unit)', () => {
     networkService.get.mockImplementation(({ url }) => {
       switch (url) {
         case getChainUrl:
-          return Promise.resolve({ data: chain, status: 200 });
+          return Promise.resolve({ data: rawify(chain), status: 200 });
         case getSafeUrl:
-          return Promise.resolve({ data: safe, status: 200 });
+          return Promise.resolve({ data: rawify(safe), status: 200 });
         case getMultisigTransactionUrl: {
           const error = new NetworkResponseError(
             new URL(getMultisigTransactionUrl),
@@ -421,7 +427,7 @@ describe('Get by id - Transactions Controller (Unit)', () => {
     const contract = contractBuilder().build();
     const executionDate = faker.date.recent();
     const safeTxGas = faker.number.int();
-    const gasPrice = faker.string.hexadecimal();
+    const gasPrice = faker.string.numeric();
     const baseGas = faker.number.int();
     const confirmations = [
       confirmationBuilder().build(),
@@ -466,21 +472,30 @@ describe('Get by id - Transactions Controller (Unit)', () => {
     networkService.get.mockImplementation(({ url }) => {
       switch (url) {
         case getChainUrl:
-          return Promise.resolve({ data: chain, status: 200 });
+          return Promise.resolve({ data: rawify(chain), status: 200 });
         case getMultisigTransactionUrl:
-          return Promise.resolve({ data: multisigToJson(tx), status: 200 });
+          return Promise.resolve({
+            data: rawify(multisigToJson(tx)),
+            status: 200,
+          });
         case getMultisigTransactionsUrl:
-          return Promise.resolve({ data: rejectionTxsPage, status: 200 });
+          return Promise.resolve({
+            data: rawify(rejectionTxsPage),
+            status: 200,
+          });
         case getSafeUrl:
-          return Promise.resolve({ data: safe, status: 200 });
+          return Promise.resolve({ data: rawify(safe), status: 200 });
         case getGasTokenContractUrl:
-          return Promise.resolve({ data: gasToken, status: 200 });
+          return Promise.resolve({ data: rawify(gasToken), status: 200 });
         case getToContractUrl:
-          return Promise.resolve({ data: contract, status: 200 });
+          return Promise.resolve({ data: rawify(contract), status: 200 });
         case getToTokenUrl:
-          return Promise.resolve({ data: token, status: 200 });
+          return Promise.resolve({ data: rawify(token), status: 200 });
         case getSafeAppsUrl:
-          return Promise.resolve({ data: safeAppsResponse, status: 200 });
+          return Promise.resolve({
+            data: rawify(safeAppsResponse),
+            status: 200,
+          });
         default:
           return Promise.reject(new Error(`Could not match ${url}`));
       }
@@ -586,7 +601,7 @@ describe('Get by id - Transactions Controller (Unit)', () => {
     const contract = contractBuilder().build();
     const executionDate = faker.date.recent();
     const safeTxGas = faker.number.int();
-    const gasPrice = faker.string.hexadecimal();
+    const gasPrice = faker.string.numeric();
     const baseGas = faker.number.int();
     const confirmations = [
       confirmationBuilder().build(),
@@ -633,21 +648,30 @@ describe('Get by id - Transactions Controller (Unit)', () => {
     networkService.get.mockImplementation(({ url }) => {
       switch (url) {
         case getChainUrl:
-          return Promise.resolve({ data: chain, status: 200 });
+          return Promise.resolve({ data: rawify(chain), status: 200 });
         case getMultisigTransactionUrl:
-          return Promise.resolve({ data: multisigToJson(tx), status: 200 });
+          return Promise.resolve({
+            data: rawify(multisigToJson(tx)),
+            status: 200,
+          });
         case getMultisigTransactionsUrl:
-          return Promise.resolve({ data: rejectionTxsPage, status: 200 });
+          return Promise.resolve({
+            data: rawify(rejectionTxsPage),
+            status: 200,
+          });
         case getSafeUrl:
-          return Promise.resolve({ data: safe, status: 200 });
+          return Promise.resolve({ data: rawify(safe), status: 200 });
         case getGasTokenContractUrl:
-          return Promise.resolve({ data: gasToken, status: 200 });
+          return Promise.resolve({ data: rawify(gasToken), status: 200 });
         case getToContractUrl:
-          return Promise.resolve({ data: contract, status: 200 });
+          return Promise.resolve({ data: rawify(contract), status: 200 });
         case getToTokenUrl:
-          return Promise.resolve({ data: token, status: 200 });
+          return Promise.resolve({ data: rawify(token), status: 200 });
         case getSafeAppsUrl:
-          return Promise.resolve({ data: safeAppsResponse, status: 200 });
+          return Promise.resolve({
+            data: rawify(safeAppsResponse),
+            status: 200,
+          });
         default:
           return Promise.reject(new Error(`Could not match ${url}`));
       }
@@ -754,7 +778,7 @@ describe('Get by id - Transactions Controller (Unit)', () => {
     const contract = contractBuilder().build();
     const executionDate = faker.date.recent();
     const safeTxGas = faker.number.int();
-    const gasPrice = faker.string.hexadecimal();
+    const gasPrice = faker.string.numeric();
     const baseGas = faker.number.int();
     const confirmations = [
       confirmationBuilder().build(),
@@ -801,19 +825,28 @@ describe('Get by id - Transactions Controller (Unit)', () => {
     networkService.get.mockImplementation(({ url }) => {
       switch (url) {
         case getChainUrl:
-          return Promise.resolve({ data: chain, status: 200 });
+          return Promise.resolve({ data: rawify(chain), status: 200 });
         case getMultisigTransactionUrl:
-          return Promise.resolve({ data: multisigToJson(tx), status: 200 });
+          return Promise.resolve({
+            data: rawify(multisigToJson(tx)),
+            status: 200,
+          });
         case getMultisigTransactionsUrl:
-          return Promise.resolve({ data: rejectionTxsPage, status: 200 });
+          return Promise.resolve({
+            data: rawify(rejectionTxsPage),
+            status: 200,
+          });
         case getSafeUrl:
-          return Promise.resolve({ data: safe, status: 200 });
+          return Promise.resolve({ data: rawify(safe), status: 200 });
         case getGasTokenContractUrl:
-          return Promise.resolve({ data: gasToken, status: 200 });
+          return Promise.resolve({ data: rawify(gasToken), status: 200 });
         case getToContractUrl:
-          return Promise.resolve({ data: contract, status: 200 });
+          return Promise.resolve({ data: rawify(contract), status: 200 });
         case getSafeAppsUrl:
-          return Promise.resolve({ data: safeAppsResponse, status: 200 });
+          return Promise.resolve({
+            data: rawify(safeAppsResponse),
+            status: 200,
+          });
         default:
           return Promise.reject(new Error(`Could not match ${url}`));
       }

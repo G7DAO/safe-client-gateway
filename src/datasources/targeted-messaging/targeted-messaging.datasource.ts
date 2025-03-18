@@ -23,9 +23,15 @@ import { SubmissionNotFoundError } from '@/domain/targeted-messaging/errors/subm
 import { TargetedSafeNotFoundError } from '@/domain/targeted-messaging/errors/targeted-safe-not-found.error';
 import { ILoggingService, LoggingService } from '@/logging/logging.interface';
 import { asError } from '@/logging/utils';
-import { Inject, UnprocessableEntityException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import postgres from 'postgres';
 
+@Injectable()
 export class TargetedMessagingDatasource
   implements ITargetedMessagingDatasource
 {
@@ -52,8 +58,8 @@ export class TargetedMessagingDatasource
   async createOutreach(
     createOutreachDto: CreateOutreachDto,
   ): Promise<Outreach> {
-    const [dbOutreach] = await this.sql<DbOutreach[]>`
-      INSERT INTO outreaches (name, start_date, end_date, source_id, type, team_name, source_file, source_file_processed_date, source_file_checksum)
+    const [dbOutreach] = await this.sql<Array<DbOutreach>>`
+      INSERT INTO outreaches (name, start_date, end_date, source_id, type, team_name, source_file, target_all, source_file_processed_date, source_file_checksum)
       VALUES (
         ${createOutreachDto.name}, 
         ${createOutreachDto.startDate}, 
@@ -62,6 +68,7 @@ export class TargetedMessagingDatasource
         ${createOutreachDto.type}, 
         ${createOutreachDto.teamName},
         ${createOutreachDto.sourceFile},
+        ${createOutreachDto.targetAll},
         ${createOutreachDto.sourceFileProcessedDate},
         ${createOutreachDto.sourceFileChecksum}
         )
@@ -78,7 +85,7 @@ export class TargetedMessagingDatasource
   async updateOutreach(
     updateOutreachDto: UpdateOutreachDto,
   ): Promise<Outreach> {
-    const [dbOutreach] = await this.sql<DbOutreach[]>`
+    const [dbOutreach] = await this.sql<Array<DbOutreach>>`
     UPDATE outreaches SET
       name = ${updateOutreachDto.name},
       start_date = ${updateOutreachDto.startDate},
@@ -96,10 +103,38 @@ export class TargetedMessagingDatasource
     return this.outreachDbMapper.map(dbOutreach);
   }
 
-  async getUnprocessedOutreaches(): Promise<Outreach[]> {
+  async getOutreachOrFail(outreachId: number): Promise<Outreach> {
+    const [dbOutreach] = await this.sql<
+      Array<DbOutreach>
+    >`SELECT target_all FROM outreaches WHERE id = ${outreachId}`.catch(
+      (err) => {
+        this.loggingService.warn(
+          `Error getting outreach: ${asError(err).message}`,
+        );
+        throw new UnprocessableEntityException('Error getting outreach');
+      },
+    );
+
+    if (!dbOutreach) {
+      throw new NotFoundException('Outreach not found');
+    }
+
+    return this.outreachDbMapper.map(dbOutreach);
+  }
+
+  async getUnprocessedOutreaches(): Promise<Array<Outreach>> {
     const dbOutreaches = await this.sql<
-      DbOutreach[]
-    >`SELECT * FROM outreaches WHERE source_file_processed_date IS NULL`;
+      Array<DbOutreach>
+    >`SELECT * FROM outreaches WHERE source_file_processed_date IS NULL`.catch(
+      (err) => {
+        this.loggingService.warn(
+          `Error getting unprocessed outreaches: ${asError(err).message}`,
+        );
+        throw new UnprocessableEntityException(
+          'Error getting unprocessed outreaches',
+        );
+      },
+    );
 
     return dbOutreaches.map((dbOutreach) =>
       this.outreachDbMapper.map(dbOutreach),
@@ -107,7 +142,7 @@ export class TargetedMessagingDatasource
   }
 
   async markOutreachAsProcessed(outreach: Outreach): Promise<Outreach> {
-    const [updatedDbOutreach] = await this.sql<DbOutreach[]>`
+    const [updatedDbOutreach] = await this.sql<Array<DbOutreach>>`
       UPDATE outreaches
       SET source_file_processed_date = ${new Date()}
       WHERE id = ${outreach.id}
@@ -143,7 +178,7 @@ export class TargetedMessagingDatasource
       });
 
       const dbTargetedSafes = await sql<
-        DbTargetedSafe[]
+        Array<DbTargetedSafe>
       >`SELECT * FROM targeted_safes WHERE id = ANY(${inserted.map((i) => i.id)})`;
 
       return dbTargetedSafes.map((dbTargetedSafe) =>
@@ -163,7 +198,7 @@ export class TargetedMessagingDatasource
     safeAddress: `0x${string}`;
   }): Promise<TargetedSafe> {
     const [dbTargetedSafe] = await this.cachedQueryResolver.get<
-      DbTargetedSafe[]
+      Array<DbTargetedSafe>
     >({
       cacheDir: CacheRouter.getTargetedSafeCacheDir(args),
       query: this.sql`
@@ -183,7 +218,7 @@ export class TargetedMessagingDatasource
     targetedSafe: TargetedSafe;
     signerAddress: `0x${string}`;
   }): Promise<Submission> {
-    const [dbSubmission] = await this.sql<DbSubmission[]>`
+    const [dbSubmission] = await this.sql<Array<DbSubmission>>`
       INSERT INTO submissions (targeted_safe_id, signer_address, completion_date)
       VALUES (${args.targetedSafe.id}, ${args.signerAddress}, ${new Date()})
       RETURNING *`.catch((err) => {
@@ -203,7 +238,9 @@ export class TargetedMessagingDatasource
     targetedSafe: TargetedSafe;
     signerAddress: `0x${string}`;
   }): Promise<Submission> {
-    const [dbSubmission] = await this.cachedQueryResolver.get<DbSubmission[]>({
+    const [dbSubmission] = await this.cachedQueryResolver.get<
+      Array<DbSubmission>
+    >({
       cacheDir: CacheRouter.getSubmissionCacheDir({
         outreachId: args.targetedSafe.outreachId,
         safeAddress: args.targetedSafe.address,

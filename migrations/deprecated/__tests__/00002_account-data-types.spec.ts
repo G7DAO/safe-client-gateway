@@ -1,7 +1,9 @@
 import { TestDbFactory } from '@/__tests__/db.factory';
+import { waitMilliseconds } from '@/__tests__/util/retry';
 import { PostgresDatabaseMigrator } from '@/datasources/db/v1/postgres-database.migrator';
 import { faker } from '@faker-js/faker';
-import postgres, { Sql } from 'postgres';
+import type { Sql } from 'postgres';
+import type postgres from 'postgres';
 
 interface AccountDataTypeRow {
   id: number;
@@ -27,8 +29,6 @@ describe('Migration 00002_account-data-types', () => {
   });
 
   it('runs successfully', async () => {
-    await sql`DROP TABLE IF EXISTS account_data_types CASCADE;`;
-
     const result = await migrator.test({
       migration: '00002_account-data-types',
       after: async (sql: Sql) => {
@@ -83,8 +83,6 @@ describe('Migration 00002_account-data-types', () => {
   });
 
   it('should add and update row timestamps', async () => {
-    await sql`DROP TABLE IF EXISTS account_data_types CASCADE;`;
-
     const result: { before: unknown; after: AccountDataTypeRow[] } =
       await migrator.test({
         migration: '00002_account-data-types',
@@ -106,6 +104,8 @@ describe('Migration 00002_account-data-types', () => {
     expect(createdAt).toBeInstanceOf(Date);
     expect(createdAt).toStrictEqual(updatedAt);
 
+    // wait for 1 millisecond to ensure that the updated_at timestamp is different
+    await waitMilliseconds(1);
     // only updated_at should be updated after the row is updated
     await sql`UPDATE account_data_types set name = 'updatedName' WHERE id = 1;`;
     const afterUpdate = await sql<

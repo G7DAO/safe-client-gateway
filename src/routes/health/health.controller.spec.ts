@@ -22,6 +22,8 @@ import { TestPostgresDatabaseModule } from '@/datasources/db/__tests__/test.post
 import { PostgresDatabaseModule } from '@/datasources/db/v1/postgres-database.module';
 import { PostgresDatabaseModuleV2 } from '@/datasources/db/v2/postgres-database.module';
 import { TestPostgresDatabaseModuleV2 } from '@/datasources/db/v2/test.postgres-database.module';
+import { TestTargetedMessagingDatasourceModule } from '@/datasources/targeted-messaging/__tests__/test.targeted-messaging.datasource.module';
+import { TargetedMessagingDatasourceModule } from '@/datasources/targeted-messaging/targeted-messaging.datasource.module';
 
 describe('Health Controller tests', () => {
   let app: INestApplication<Server>;
@@ -36,6 +38,8 @@ describe('Health Controller tests', () => {
     })
       .overrideModule(PostgresDatabaseModule)
       .useModule(TestPostgresDatabaseModule)
+      .overrideModule(TargetedMessagingDatasourceModule)
+      .useModule(TestTargetedMessagingDatasourceModule)
       .overrideModule(CacheModule)
       .useModule(TestCacheModule)
       .overrideModule(RequestScopedLoggingModule)
@@ -89,7 +93,30 @@ describe('Health Controller tests', () => {
   });
 
   describe('liveness tests', () => {
-    it('service is alive if it accepts requests', async () => {
+    it('cache service is not ready', async () => {
+      cacheService.setReadyState(false);
+      queuesApi.isReady.mockReturnValue(true);
+
+      await request(app.getHttpServer())
+        .get(`/health/live`)
+        .expect(503)
+        .expect({ status: 'KO' });
+    });
+
+    it('queues are not ready', async () => {
+      cacheService.setReadyState(true);
+      queuesApi.isReady.mockReturnValue(false);
+
+      await request(app.getHttpServer())
+        .get(`/health/live`)
+        .expect(503)
+        .expect({ status: 'KO' });
+    });
+
+    it('service is alive if it accepts requests, cache service and queues are ready', async () => {
+      cacheService.setReadyState(true);
+      queuesApi.isReady.mockReturnValue(true);
+
       await request(app.getHttpServer())
         .get(`/health/live`)
         .expect(200)
