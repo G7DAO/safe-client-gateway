@@ -12,7 +12,7 @@ import { chainBuilder } from '@/domain/chains/entities/__tests__/chain.builder';
 import {
   dataDecodedBuilder,
   dataDecodedParameterBuilder,
-} from '@/domain/data-decoder/entities/__tests__/data-decoded.builder';
+} from '@/domain/data-decoder/v1/entities/__tests__/data-decoded.builder';
 import { pageBuilder } from '@/domain/entities/__tests__/page.builder';
 import {
   ethereumTransactionBuilder,
@@ -50,6 +50,11 @@ import type { MultisigTransaction } from '@/domain/safe/entities/multisig-transa
 import type { Server } from 'net';
 import { PostgresDatabaseModuleV2 } from '@/datasources/db/v2/postgres-database.module';
 import { TestPostgresDatabaseModuleV2 } from '@/datasources/db/v2/test.postgres-database.module';
+import { PostgresDatabaseModule } from '@/datasources/db/v1/postgres-database.module';
+import { TestPostgresDatabaseModule } from '@/datasources/db/__tests__/test.postgres-database.module';
+import { TestTargetedMessagingDatasourceModule } from '@/datasources/targeted-messaging/__tests__/test.targeted-messaging.datasource.module';
+import { TargetedMessagingDatasourceModule } from '@/datasources/targeted-messaging/targeted-messaging.datasource.module';
+import { rawify } from '@/validation/entities/raw.entity';
 
 describe('Transactions History Controller (Unit) - Imitation Transactions', () => {
   let app: INestApplication<Server>;
@@ -80,7 +85,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
       },
       features: {
         ...configuration().features,
-        imitationMapping: true,
         improvedAddressPoisoning: true,
       },
     });
@@ -88,6 +92,10 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule.register(testConfiguration)],
     })
+      .overrideModule(PostgresDatabaseModule)
+      .useModule(TestPostgresDatabaseModule)
+      .overrideModule(TargetedMessagingDatasourceModule)
+      .useModule(TestTargetedMessagingDatasourceModule)
       .overrideModule(CacheModule)
       .useModule(TestCacheModule)
       .overrideModule(RequestScopedLoggingModule)
@@ -114,17 +122,17 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
     await app.close();
   });
 
+  function getImitationAddress(address: `0x${string}`): `0x${string}` {
+    // + 2 is to account for the '0x' prefix
+    const prefix = address.slice(0, prefixLength + 2);
+    const suffix = address.slice(-suffixLength);
+    const imitator = `${prefix}${faker.finance.ethereumAddress().slice(prefixLength + 2, -suffixLength)}${suffix}`;
+    return getAddress(imitator);
+  }
+
   describe('Event spoofing', () => {
     function parseUnits(value: bigint, decimals: number): bigint {
       return value * BigInt(10 ** decimals);
-    }
-
-    function getImitationAddress(address: `0x${string}`): `0x${string}` {
-      // + 2 is to account for the '0x' prefix
-      const prefix = address.slice(0, prefixLength + 2);
-      const suffix = address.slice(-suffixLength);
-      const imitator = `${prefix}${faker.finance.ethereumAddress().slice(prefixLength + 2, -suffixLength)}${suffix}`;
-      return getAddress(imitator);
     }
 
     const multisigExecutionDate = new Date('2024-03-20T09:41:25Z');
@@ -326,32 +334,32 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
         ];
         networkService.get.mockImplementation(({ url }) => {
           if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-            return Promise.resolve({ data: chain, status: 200 });
+            return Promise.resolve({ data: rawify(chain), status: 200 });
           }
           if (url === getAllTransactionsUrl) {
             return Promise.resolve({
-              data: pageBuilder().with('results', results).build(),
+              data: rawify(pageBuilder().with('results', results).build()),
               status: 200,
             });
           }
           if (url === getSafeUrl) {
-            return Promise.resolve({ data: safe, status: 200 });
+            return Promise.resolve({ data: rawify(safe), status: 200 });
           }
           if (url === getTokenAddressUrl) {
             return Promise.resolve({
-              data: multisigToken,
+              data: rawify(multisigToken),
               status: 200,
             });
           }
           if (url === getNotImitatedTokenAddressUrl) {
             return Promise.resolve({
-              data: notImitatedMultisigToken,
+              data: rawify(notImitatedMultisigToken),
               status: 200,
             });
           }
           if (url === getImitationTokenAddressUrl) {
             return Promise.resolve({
-              data: imitationToken,
+              data: rawify(imitationToken),
               status: 200,
             });
           }
@@ -385,7 +393,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: safe.address,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -431,7 +438,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -471,7 +477,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: imitationAddress,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -518,7 +523,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -563,7 +567,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -602,32 +605,32 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
 
         networkService.get.mockImplementation(({ url }) => {
           if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-            return Promise.resolve({ data: chain, status: 200 });
+            return Promise.resolve({ data: rawify(chain), status: 200 });
           }
           if (url === getAllTransactionsUrl) {
             return Promise.resolve({
-              data: pageBuilder().with('results', results).build(),
+              data: rawify(pageBuilder().with('results', results).build()),
               status: 200,
             });
           }
           if (url === getSafeUrl) {
-            return Promise.resolve({ data: safe, status: 200 });
+            return Promise.resolve({ data: rawify(safe), status: 200 });
           }
           if (url === getTokenAddressUrl) {
             return Promise.resolve({
-              data: multisigToken,
+              data: rawify(multisigToken),
               status: 200,
             });
           }
           if (url === getNotImitatedTokenAddressUrl) {
             return Promise.resolve({
-              data: notImitatedMultisigToken,
+              data: rawify(notImitatedMultisigToken),
               status: 200,
             });
           }
           if (url === getImitationTokenAddressUrl) {
             return Promise.resolve({
-              data: imitationToken,
+              data: rawify(imitationToken),
               status: 200,
             });
           }
@@ -661,7 +664,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: safe.address,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -702,7 +704,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: imitationAddress,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -749,7 +750,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -795,7 +795,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -840,7 +839,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -879,32 +877,32 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
 
         networkService.get.mockImplementation(({ url }) => {
           if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-            return Promise.resolve({ data: chain, status: 200 });
+            return Promise.resolve({ data: rawify(chain), status: 200 });
           }
           if (url === getAllTransactionsUrl) {
             return Promise.resolve({
-              data: pageBuilder().with('results', results).build(),
+              data: rawify(pageBuilder().with('results', results).build()),
               status: 200,
             });
           }
           if (url === getSafeUrl) {
-            return Promise.resolve({ data: safe, status: 200 });
+            return Promise.resolve({ data: rawify(safe), status: 200 });
           }
           if (url === getTokenAddressUrl) {
             return Promise.resolve({
-              data: multisigToken,
+              data: rawify(multisigToken),
               status: 200,
             });
           }
           if (url === getNotImitatedTokenAddressUrl) {
             return Promise.resolve({
-              data: notImitatedMultisigToken,
+              data: rawify(notImitatedMultisigToken),
               status: 200,
             });
           }
           if (url === getImitationTokenAddressUrl) {
             return Promise.resolve({
-              data: imitationToken,
+              data: rawify(imitationToken),
               status: 200,
             });
           }
@@ -943,7 +941,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -989,7 +986,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1034,7 +1030,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1073,32 +1068,32 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
 
         networkService.get.mockImplementation(({ url }) => {
           if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-            return Promise.resolve({ data: chain, status: 200 });
+            return Promise.resolve({ data: rawify(chain), status: 200 });
           }
           if (url === getAllTransactionsUrl) {
             return Promise.resolve({
-              data: pageBuilder().with('results', results).build(),
+              data: rawify(pageBuilder().with('results', results).build()),
               status: 200,
             });
           }
           if (url === getSafeUrl) {
-            return Promise.resolve({ data: safe, status: 200 });
+            return Promise.resolve({ data: rawify(safe), status: 200 });
           }
           if (url === getTokenAddressUrl) {
             return Promise.resolve({
-              data: multisigToken,
+              data: rawify(multisigToken),
               status: 200,
             });
           }
           if (url === getNotImitatedTokenAddressUrl) {
             return Promise.resolve({
-              data: notImitatedMultisigToken,
+              data: rawify(notImitatedMultisigToken),
               status: 200,
             });
           }
           if (url === getImitationTokenAddressUrl) {
             return Promise.resolve({
-              data: imitationToken,
+              data: rawify(imitationToken),
               status: 200,
             });
           }
@@ -1132,7 +1127,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: safe.address,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1173,7 +1167,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: imitationAddress,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1220,7 +1213,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1266,7 +1258,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1311,7 +1302,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1376,32 +1366,32 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
         ];
         networkService.get.mockImplementation(({ url }) => {
           if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-            return Promise.resolve({ data: chain, status: 200 });
+            return Promise.resolve({ data: rawify(chain), status: 200 });
           }
           if (url === getAllTransactionsUrl) {
             return Promise.resolve({
-              data: pageBuilder().with('results', results).build(),
+              data: rawify(pageBuilder().with('results', results).build()),
               status: 200,
             });
           }
           if (url === getSafeUrl) {
-            return Promise.resolve({ data: safe, status: 200 });
+            return Promise.resolve({ data: rawify(safe), status: 200 });
           }
           if (url === getTokenAddressUrl) {
             return Promise.resolve({
-              data: multisigToken,
+              data: rawify(multisigToken),
               status: 200,
             });
           }
           if (url === getNotImitatedTokenAddressUrl) {
             return Promise.resolve({
-              data: notImitatedMultisigToken,
+              data: rawify(notImitatedMultisigToken),
               status: 200,
             });
           }
           if (url === getImitationTokenAddressUrl) {
             return Promise.resolve({
-              data: imitationToken,
+              data: rawify(imitationToken),
               status: 200,
             });
           }
@@ -1435,7 +1425,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: safe.address,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1485,7 +1474,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1527,7 +1515,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: imitationAddress,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1578,7 +1565,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1623,7 +1609,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1661,32 +1646,32 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
         ];
         networkService.get.mockImplementation(({ url }) => {
           if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-            return Promise.resolve({ data: chain, status: 200 });
+            return Promise.resolve({ data: rawify(chain), status: 200 });
           }
           if (url === getAllTransactionsUrl) {
             return Promise.resolve({
-              data: pageBuilder().with('results', results).build(),
+              data: rawify(pageBuilder().with('results', results).build()),
               status: 200,
             });
           }
           if (url === getSafeUrl) {
-            return Promise.resolve({ data: safe, status: 200 });
+            return Promise.resolve({ data: rawify(safe), status: 200 });
           }
           if (url === getTokenAddressUrl) {
             return Promise.resolve({
-              data: multisigToken,
+              data: rawify(multisigToken),
               status: 200,
             });
           }
           if (url === getNotImitatedTokenAddressUrl) {
             return Promise.resolve({
-              data: notImitatedMultisigToken,
+              data: rawify(notImitatedMultisigToken),
               status: 200,
             });
           }
           if (url === getImitationTokenAddressUrl) {
             return Promise.resolve({
-              data: imitationToken,
+              data: rawify(imitationToken),
               status: 200,
             });
           }
@@ -1720,7 +1705,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: safe.address,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1767,7 +1751,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: imitationAddress,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1818,7 +1801,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1864,7 +1846,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1909,7 +1890,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -1947,32 +1927,32 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
         ];
         networkService.get.mockImplementation(({ url }) => {
           if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-            return Promise.resolve({ data: chain, status: 200 });
+            return Promise.resolve({ data: rawify(chain), status: 200 });
           }
           if (url === getAllTransactionsUrl) {
             return Promise.resolve({
-              data: pageBuilder().with('results', results).build(),
+              data: rawify(pageBuilder().with('results', results).build()),
               status: 200,
             });
           }
           if (url === getSafeUrl) {
-            return Promise.resolve({ data: safe, status: 200 });
+            return Promise.resolve({ data: rawify(safe), status: 200 });
           }
           if (url === getTokenAddressUrl) {
             return Promise.resolve({
-              data: multisigToken,
+              data: rawify(multisigToken),
               status: 200,
             });
           }
           if (url === getNotImitatedTokenAddressUrl) {
             return Promise.resolve({
-              data: notImitatedMultisigToken,
+              data: rawify(notImitatedMultisigToken),
               status: 200,
             });
           }
           if (url === getImitationTokenAddressUrl) {
             return Promise.resolve({
-              data: imitationToken,
+              data: rawify(imitationToken),
               status: 200,
             });
           }
@@ -2006,7 +1986,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: safe.address,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -2056,7 +2035,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -2098,7 +2076,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: imitationAddress,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -2149,7 +2126,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -2194,7 +2170,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -2232,32 +2207,32 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
         ];
         networkService.get.mockImplementation(({ url }) => {
           if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-            return Promise.resolve({ data: chain, status: 200 });
+            return Promise.resolve({ data: rawify(chain), status: 200 });
           }
           if (url === getAllTransactionsUrl) {
             return Promise.resolve({
-              data: pageBuilder().with('results', results).build(),
+              data: rawify(pageBuilder().with('results', results).build()),
               status: 200,
             });
           }
           if (url === getSafeUrl) {
-            return Promise.resolve({ data: safe, status: 200 });
+            return Promise.resolve({ data: rawify(safe), status: 200 });
           }
           if (url === getTokenAddressUrl) {
             return Promise.resolve({
-              data: multisigToken,
+              data: rawify(multisigToken),
               status: 200,
             });
           }
           if (url === getNotImitatedTokenAddressUrl) {
             return Promise.resolve({
-              data: notImitatedMultisigToken,
+              data: rawify(notImitatedMultisigToken),
               status: 200,
             });
           }
           if (url === getImitationTokenAddressUrl) {
             return Promise.resolve({
-              data: imitationToken,
+              data: rawify(imitationToken),
               status: 200,
             });
           }
@@ -2291,7 +2266,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: safe.address,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -2338,7 +2312,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: imitationAddress,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -2389,7 +2362,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -2435,7 +2407,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -2480,7 +2451,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -2563,20 +2533,20 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
       ];
       networkService.get.mockImplementation(({ url }) => {
         if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-          return Promise.resolve({ data: chain, status: 200 });
+          return Promise.resolve({ data: rawify(chain), status: 200 });
         }
         if (url === getAllTransactionsUrl) {
           return Promise.resolve({
-            data: pageBuilder().with('results', results).build(),
+            data: rawify(pageBuilder().with('results', results).build()),
             status: 200,
           });
         }
         if (url === getSafeUrl) {
-          return Promise.resolve({ data: safe, status: 200 });
+          return Promise.resolve({ data: rawify(safe), status: 200 });
         }
         if (url === getTokenAddressUrl) {
           return Promise.resolve({
-            data: multisigToken,
+            data: rawify(multisigToken),
             status: 200,
           });
         }
@@ -2585,7 +2555,7 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
           `${chain.transactionService}/api/v1/tokens/${imitationWithDifferentDecimalsToken.address}`
         ) {
           return Promise.resolve({
-            data: imitationWithDifferentDecimalsToken,
+            data: rawify(imitationWithDifferentDecimalsToken),
             status: 200,
           });
         }
@@ -2619,7 +2589,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                     name: null,
                     value: safe.address,
                   },
-                  richDecodedInfo: null,
                   sender: {
                     logoUri: null,
                     name: null,
@@ -2666,7 +2635,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                     name: null,
                     value: multisigTransfer.to,
                   },
-                  richDecodedInfo: null,
                   sender: {
                     logoUri: null,
                     name: null,
@@ -2820,6 +2788,7 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
       // TODO: Update type to include transfers
       transfers: [erc20TransferToJson(notImitatedMultisigTransfer) as Transfer],
     } as MultisigTransaction;
+    const imitationAddress = getImitationAddress(multisigTransfer.to);
 
     const getAllTransactionsUrl = `${chain.transactionService}/api/v1/safes/${safe.address}/all-transactions/`;
     const getSafeUrl = `${chain.transactionService}/api/v1/safes/${safe.address}`;
@@ -2831,6 +2800,7 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
       const imitationIncomingTransfer = {
         ...erc20TransferBuilder()
           .with('to', safe.address)
+          .with('from', imitationAddress)
           .with('tokenAddress', multisigToken.address)
           .with(
             'value',
@@ -2857,24 +2827,24 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
           .build(),
       ) as EthereumTransaction;
 
-      it('should flag imitation incoming transfers with a below-limit value within the lookup distance', async () => {
+      it('should flag imitation incoming transfers of vanity with a below-limit value within the lookup distance', async () => {
         const results = [imitationIncomingTransaction, multisigTransaction];
         networkService.get.mockImplementation(({ url }) => {
           if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-            return Promise.resolve({ data: chain, status: 200 });
+            return Promise.resolve({ data: rawify(chain), status: 200 });
           }
           if (url === getAllTransactionsUrl) {
             return Promise.resolve({
-              data: pageBuilder().with('results', results).build(),
+              data: rawify(pageBuilder().with('results', results).build()),
               status: 200,
             });
           }
           if (url === getSafeUrl) {
-            return Promise.resolve({ data: safe, status: 200 });
+            return Promise.resolve({ data: rawify(safe), status: 200 });
           }
           if (url === getTokenAddressUrl) {
             return Promise.resolve({
-              data: multisigToken,
+              data: rawify(multisigToken),
               status: 200,
             });
           }
@@ -2908,7 +2878,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: safe.address,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -2954,7 +2923,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -2982,7 +2950,7 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
           });
       });
 
-      it('should not flag imitation incoming transfers with a below-limit value outside the lookup distance', async () => {
+      it('should not flag imitation incoming transfers of vanity with a below-limit value outside the lookup distance', async () => {
         const results = [
           imitationIncomingTransaction,
           notImitatedMultisigTransaction,
@@ -2993,26 +2961,26 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
 
         networkService.get.mockImplementation(({ url }) => {
           if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-            return Promise.resolve({ data: chain, status: 200 });
+            return Promise.resolve({ data: rawify(chain), status: 200 });
           }
           if (url === getAllTransactionsUrl) {
             return Promise.resolve({
-              data: pageBuilder().with('results', results).build(),
+              data: rawify(pageBuilder().with('results', results).build()),
               status: 200,
             });
           }
           if (url === getSafeUrl) {
-            return Promise.resolve({ data: safe, status: 200 });
+            return Promise.resolve({ data: rawify(safe), status: 200 });
           }
           if (url === getTokenAddressUrl) {
             return Promise.resolve({
-              data: multisigToken,
+              data: rawify(multisigToken),
               status: 200,
             });
           }
           if (url === getNotImitatedTokenAddressUrl) {
             return Promise.resolve({
-              data: notImitatedMultisigToken,
+              data: rawify(notImitatedMultisigToken),
               status: 200,
             });
           }
@@ -3046,7 +3014,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: safe.address,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -3093,7 +3060,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -3139,7 +3105,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -3185,7 +3150,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -3230,7 +3194,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -3258,24 +3221,24 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
           });
       });
 
-      it('should filter out imitation incoming transfers with a below-limit value within the lookup distance', async () => {
+      it('should filter out imitation incoming transfers of vanity with a below-limit value within the lookup distance', async () => {
         const results = [imitationIncomingTransaction, multisigTransaction];
         networkService.get.mockImplementation(({ url }) => {
           if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-            return Promise.resolve({ data: chain, status: 200 });
+            return Promise.resolve({ data: rawify(chain), status: 200 });
           }
           if (url === getAllTransactionsUrl) {
             return Promise.resolve({
-              data: pageBuilder().with('results', results).build(),
+              data: rawify(pageBuilder().with('results', results).build()),
               status: 200,
             });
           }
           if (url === getSafeUrl) {
-            return Promise.resolve({ data: safe, status: 200 });
+            return Promise.resolve({ data: rawify(safe), status: 200 });
           }
           if (url === getTokenAddressUrl) {
             return Promise.resolve({
-              data: multisigToken,
+              data: rawify(multisigToken),
               status: 200,
             });
           }
@@ -3314,7 +3277,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -3342,7 +3304,7 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
           });
       });
 
-      it('should not filter out imitation incoming transfers with a below-limit value outside the lookup distance', async () => {
+      it('should not filter out imitation incoming transfers of vanity with a below-limit value outside the lookup distance', async () => {
         const results = [
           imitationIncomingTransaction,
           notImitatedMultisigTransaction,
@@ -3353,26 +3315,26 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
 
         networkService.get.mockImplementation(({ url }) => {
           if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-            return Promise.resolve({ data: chain, status: 200 });
+            return Promise.resolve({ data: rawify(chain), status: 200 });
           }
           if (url === getAllTransactionsUrl) {
             return Promise.resolve({
-              data: pageBuilder().with('results', results).build(),
+              data: rawify(pageBuilder().with('results', results).build()),
               status: 200,
             });
           }
           if (url === getSafeUrl) {
-            return Promise.resolve({ data: safe, status: 200 });
+            return Promise.resolve({ data: rawify(safe), status: 200 });
           }
           if (url === getTokenAddressUrl) {
             return Promise.resolve({
-              data: multisigToken,
+              data: rawify(multisigToken),
               status: 200,
             });
           }
           if (url === getNotImitatedTokenAddressUrl) {
             return Promise.resolve({
-              data: notImitatedMultisigToken,
+              data: rawify(notImitatedMultisigToken),
               status: 200,
             });
           }
@@ -3406,7 +3368,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: safe.address,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -3453,7 +3414,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -3499,7 +3459,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -3545,7 +3504,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -3590,7 +3548,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -3624,6 +3581,7 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
       const aboveLimitIncomingTransfer = {
         ...erc20TransferBuilder()
           .with('to', safe.address)
+          .with('from', imitationAddress)
           .with('tokenAddress', multisigToken.address)
           .with(
             'value',
@@ -3652,31 +3610,31 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
 
       it.each([
         [
-          'should not flag imitation incoming transfers with an above-limit value within the lookup distance',
+          'should not flag imitation incoming transfers of vanity with an above-limit value within the lookup distance',
           true,
         ],
         [
-          'should not filter out imitation incoming transfers with an above-limit value within the lookup distance',
+          'should not filter out imitation incoming of vanity transfers with an above-limit value within the lookup distance',
           false,
         ],
       ])(`%s`, async (_, filter) => {
         const results = [aboveLimitIncomingTransaction, multisigTransaction];
         networkService.get.mockImplementation(({ url }) => {
           if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-            return Promise.resolve({ data: chain, status: 200 });
+            return Promise.resolve({ data: rawify(chain), status: 200 });
           }
           if (url === getAllTransactionsUrl) {
             return Promise.resolve({
-              data: pageBuilder().with('results', results).build(),
+              data: rawify(pageBuilder().with('results', results).build()),
               status: 200,
             });
           }
           if (url === getSafeUrl) {
-            return Promise.resolve({ data: safe, status: 200 });
+            return Promise.resolve({ data: rawify(safe), status: 200 });
           }
           if (url === getTokenAddressUrl) {
             return Promise.resolve({
-              data: multisigToken,
+              data: rawify(multisigToken),
               status: 200,
             });
           }
@@ -3710,7 +3668,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: safe.address,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -3756,7 +3713,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -3786,11 +3742,11 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
 
       it.each([
         [
-          'should not flag imitation incoming transfers with an above-limit value outside the lookup distance',
+          'should not flag imitation incoming transfers of vanity with an above-limit value outside the lookup distance',
           true,
         ],
         [
-          'should not filter out imitation incoming transfers with an above-limit value outside the lookup distance',
+          'should not filter out imitation incoming of vanity transfers with an above-limit value outside the lookup distance',
           false,
         ],
       ])(`%s`, async (_, filter) => {
@@ -3803,26 +3759,26 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
         ];
         networkService.get.mockImplementation(({ url }) => {
           if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-            return Promise.resolve({ data: chain, status: 200 });
+            return Promise.resolve({ data: rawify(chain), status: 200 });
           }
           if (url === getAllTransactionsUrl) {
             return Promise.resolve({
-              data: pageBuilder().with('results', results).build(),
+              data: rawify(pageBuilder().with('results', results).build()),
               status: 200,
             });
           }
           if (url === getSafeUrl) {
-            return Promise.resolve({ data: safe, status: 200 });
+            return Promise.resolve({ data: rawify(safe), status: 200 });
           }
           if (url === getTokenAddressUrl) {
             return Promise.resolve({
-              data: multisigToken,
+              data: rawify(multisigToken),
               status: 200,
             });
           }
           if (url === getNotImitatedTokenAddressUrl) {
             return Promise.resolve({
-              data: notImitatedMultisigToken,
+              data: rawify(notImitatedMultisigToken),
               status: 200,
             });
           }
@@ -3856,7 +3812,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: safe.address,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -3903,7 +3858,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -3949,7 +3903,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -3995,7 +3948,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: notImitatedMultisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,
@@ -4040,7 +3992,6 @@ describe('Transactions History Controller (Unit) - Imitation Transactions', () =
                       name: null,
                       value: multisigTransfer.to,
                     },
-                    richDecodedInfo: null,
                     sender: {
                       logoUri: null,
                       name: null,

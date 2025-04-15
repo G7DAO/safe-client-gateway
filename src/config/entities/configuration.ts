@@ -1,3 +1,5 @@
+import { randomBytes } from 'crypto';
+
 // Custom configuration for the application
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
@@ -23,6 +25,21 @@ export default () => ({
         process.env.COUNTERFACTUAL_SAFES_CREATION_RATE_LIMIT_CALLS_BY_PERIOD ??
           `${25}`,
       ),
+    },
+    encryption: {
+      // The encryption type to use. Defaults to 'local'.
+      // Supported values: 'aws', 'local'
+      type: process.env.ACCOUNTS_ENCRYPTION_TYPE || 'local',
+      awsKms: {
+        keyId: process.env.AWS_KMS_ENCRYPTION_KEY_ID,
+        algorithm: process.env.AWS_KMS_ENCRYPTION_ALGORITHM || 'aes-256-cbc',
+      },
+      local: {
+        algorithm: process.env.LOCAL_ENCRYPTION_ALGORITHM || 'aes-256-cbc',
+        key:
+          process.env.LOCAL_ENCRYPTION_KEY || randomBytes(32).toString('hex'),
+        iv: process.env.LOCAL_ENCRYPTION_IV || randomBytes(16).toString('hex'),
+      },
     },
   },
   amqp: {
@@ -209,32 +226,23 @@ export default () => ({
     jsonLimit: process.env.EXPRESS_JSON_LIMIT ?? '1mb',
   },
   features: {
-    richFragments: process.env.FF_RICH_FRAGMENTS?.toLowerCase() === 'true',
     email: process.env.FF_EMAIL?.toLowerCase() === 'true',
     zerionBalancesChainIds:
       process.env.FF_ZERION_BALANCES_CHAIN_IDS?.split(',') ?? [],
-    swapsDecoding: process.env.FF_SWAPS_DECODING?.toLowerCase() === 'true',
-    twapsDecoding: process.env.FF_TWAPS_DECODING?.toLowerCase() === 'true',
     debugLogs: process.env.FF_DEBUG_LOGS?.toLowerCase() === 'true',
     configHooksDebugLogs:
       process.env.FF_CONFIG_HOOKS_DEBUG_LOGS?.toLowerCase() === 'true',
-    imitationMapping:
-      process.env.FF_IMITATION_MAPPING?.toLowerCase() === 'true',
     auth: process.env.FF_AUTH?.toLowerCase() === 'true',
-    confirmationView:
-      process.env.FF_CONFIRMATION_VIEW?.toLowerCase() === 'true',
-    eventsQueue: process.env.FF_EVENTS_QUEUE?.toLowerCase() === 'true',
     delegatesV2: process.env.FF_DELEGATES_V2?.toLowerCase() === 'true',
     counterfactualBalances:
       process.env.FF_COUNTERFACTUAL_BALANCES?.toLowerCase() === 'true',
     accounts: process.env.FF_ACCOUNTS?.toLowerCase() === 'true',
+    users: process.env.FF_USERS?.toLowerCase() === 'true',
+    // TODO: When enabled, we must add `db` as a requirement alongside `redis`
     pushNotifications:
       process.env.FF_PUSH_NOTIFICATIONS?.toLowerCase() === 'true',
-    nativeStaking: process.env.FF_NATIVE_STAKING?.toLowerCase() === 'true',
-    nativeStakingDecoding:
-      process.env.FF_NATIVE_STAKING_DECODING?.toLowerCase() === 'true',
-    targetedMessaging:
-      process.env.FF_TARGETED_MESSAGING?.toLowerCase() === 'true',
+    hookHttpPostEvent:
+      process.env.FF_HOOK_HTTP_POST_EVENT?.toLowerCase() === 'true',
     improvedAddressPoisoning:
       process.env.FF_IMPROVED_ADDRESS_POISONING?.toLowerCase() === 'true',
   },
@@ -245,14 +253,26 @@ export default () => ({
       process.env.HTTP_CLIENT_REQUEST_TIMEOUT_MILLISECONDS ?? `${5_000}`,
     ),
   },
+  jwt: {
+    issuer: process.env.JWT_ISSUER,
+    secret: process.env.JWT_SECRET,
+  },
   locking: {
     baseUri:
       process.env.LOCKING_PROVIDER_API_BASE_URI ||
       'https://safe-locking.safe.global',
+    eligibility: {
+      fingerprintEncryptionKey: process.env.FINGERPRINT_ENCRYPTION_KEY,
+      nonEligibleCountryCodes:
+        process.env.FINGERPRINT_NON_ELIGIBLE_COUNTRY_CODES?.split(',') ?? [
+          'US',
+        ],
+    },
   },
   log: {
     level: process.env.LOG_LEVEL || 'debug',
     silent: process.env.LOG_SILENT?.toLowerCase() === 'true',
+    prettyColorize: process.env.LOG_PRETTY_COLORIZE?.toLowerCase() === 'true',
   },
   owners: {
     // There is no hook to invalidate the owners, so defaulting 0 disables the cache
@@ -277,6 +297,11 @@ export default () => ({
       maxOverviews: parseInt(process.env.MAX_SAFE_OVERVIEWS ?? `${10}`),
     },
   },
+  portfolio: {
+    baseUri:
+      process.env.PORTFOLIO_API_BASE_URI || 'https://octav-api.hasura.app',
+    apiKey: process.env.PORTFOLIO_API_KEY || 'TODO',
+  },
   pushNotifications: {
     baseUri:
       process.env.PUSH_NOTIFICATIONS_API_BASE_URI ||
@@ -290,8 +315,13 @@ export default () => ({
     },
   },
   redis: {
+    user: process.env.REDIS_USER,
+    pass: process.env.REDIS_PASS,
     host: process.env.REDIS_HOST || 'localhost',
     port: process.env.REDIS_PORT || '6379',
+    timeout: process.env.REDIS_TIMEOUT || 2 * 1_000, // Milliseconds
+    disableOfflineQueue:
+      process.env.REDIS_DISABLE_OFFLINE_QUEUE?.toString() === 'true',
   },
   relay: {
     baseUri:
@@ -356,6 +386,7 @@ export default () => ({
     api: {
       1: 'https://api.cow.fi/mainnet',
       100: 'https://api.cow.fi/xdai',
+      8453: 'https://api.cow.fi/base',
       42161: 'https://api.cow.fi/arbitrum_one',
       11155111: 'https://api.cow.fi/sepolia',
     },

@@ -6,7 +6,7 @@ import {
 } from '@/domain/chains/entities/schemas/chain.schema';
 import { Chain } from '@/domain/chains/entities/chain.entity';
 import { Singleton } from '@/domain/chains/entities/singleton.entity';
-import { SingletonSchema } from '@/domain/chains/entities/schemas/singleton.schema';
+import { SingletonsSchema } from '@/domain/chains/entities/schemas/singleton.schema';
 import { Page } from '@/domain/entities/page.entity';
 import { IConfigApi } from '@/domain/interfaces/config-api.interface';
 import { ITransactionApiManager } from '@/domain/interfaces/transaction-api.manager.interface';
@@ -15,9 +15,10 @@ import {
   IndexingStatusSchema,
 } from '@/domain/indexing/entities/indexing-status.entity';
 import { ILoggingService, LoggingService } from '@/logging/logging.interface';
-import { differenceBy } from 'lodash';
+import differenceBy from 'lodash/differenceBy';
 import { PaginationData } from '@/routes/common/pagination/pagination.data';
 import { IConfigurationService } from '@/config/configuration.service.interface';
+import { LenientBasePageSchema } from '@/domain/entities/schemas/page.schema.factory';
 
 @Injectable()
 export class ChainsRepository implements IChainsRepository {
@@ -50,7 +51,9 @@ export class ChainsRepository implements IChainsRepository {
   }
 
   async getChains(limit?: number, offset?: number): Promise<Page<Chain>> {
-    const page = await this.configApi.getChains({ limit, offset });
+    const page = await this.configApi
+      .getChains({ limit, offset })
+      .then(LenientBasePageSchema.parse);
     const valid = ChainLenientPageSchema.parse(page);
     if (valid.results.length < page.results.length) {
       this.loggingService.error({
@@ -91,10 +94,10 @@ export class ChainsRepository implements IChainsRepository {
     return chains;
   }
 
-  async getSingletons(chainId: string): Promise<Singleton[]> {
+  async getSingletons(chainId: string): Promise<Array<Singleton>> {
     const transactionApi = await this.transactionApiManager.getApi(chainId);
     const singletons = await transactionApi.getSingletons();
-    return singletons.map((singleton) => SingletonSchema.parse(singleton));
+    return SingletonsSchema.parse(singletons);
   }
 
   async getIndexingStatus(chainId: string): Promise<IndexingStatus> {

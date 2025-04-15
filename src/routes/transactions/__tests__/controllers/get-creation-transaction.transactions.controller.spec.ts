@@ -15,6 +15,8 @@ import type { INetworkService } from '@/datasources/network/network.service.inte
 import { NetworkService } from '@/datasources/network/network.service.interface';
 import { TestQueuesApiModule } from '@/datasources/queues/__tests__/test.queues-api.module';
 import { QueuesApiModule } from '@/datasources/queues/queues-api.module';
+import { TestTargetedMessagingDatasourceModule } from '@/datasources/targeted-messaging/__tests__/test.targeted-messaging.datasource.module';
+import { TargetedMessagingDatasourceModule } from '@/datasources/targeted-messaging/targeted-messaging.datasource.module';
 import { chainBuilder } from '@/domain/chains/entities/__tests__/chain.builder';
 import {
   creationTransactionBuilder,
@@ -23,6 +25,7 @@ import {
 import { safeBuilder } from '@/domain/safe/entities/__tests__/safe.builder';
 import { TestLoggingModule } from '@/logging/__tests__/test.logging.module';
 import { RequestScopedLoggingModule } from '@/logging/logging.module';
+import { rawify } from '@/validation/entities/raw.entity';
 import type { INestApplication } from '@nestjs/common';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
@@ -34,12 +37,15 @@ describe('Get creation transaction', () => {
   let safeConfigUrl: string;
   let networkService: jest.MockedObjectDeep<INetworkService>;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
+    jest.resetAllMocks();
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule.register(configuration)],
     })
       .overrideModule(PostgresDatabaseModule)
       .useModule(TestPostgresDatabaseModule)
+      .overrideModule(TargetedMessagingDatasourceModule)
+      .useModule(TestTargetedMessagingDatasourceModule)
       .overrideModule(CacheModule)
       .useModule(TestCacheModule)
       .overrideModule(RequestScopedLoggingModule)
@@ -62,8 +68,6 @@ describe('Get creation transaction', () => {
     await app.init();
   });
 
-  beforeEach(() => jest.resetAllMocks());
-
   afterAll(async () => {
     await app.close();
   });
@@ -77,10 +81,10 @@ describe('Get creation transaction', () => {
     networkService.get.mockImplementation(({ url }) => {
       switch (url) {
         case getChainUrl:
-          return Promise.resolve({ data: chain, status: 200 });
+          return Promise.resolve({ data: rawify(chain), status: 200 });
         case getCreationTransactionUrl:
           return Promise.resolve({
-            data: creationTransactionToJson(creationTransaction),
+            data: rawify(creationTransactionToJson(creationTransaction)),
             status: 200,
           });
         default:
@@ -109,7 +113,7 @@ describe('Get creation transaction', () => {
     networkService.get.mockImplementation(({ url }) => {
       switch (url) {
         case getChainUrl:
-          return Promise.resolve({ data: chain, status: 200 });
+          return Promise.resolve({ data: rawify(chain), status: 200 });
         case getCreationTransactionUrl:
           return Promise.reject(
             new NetworkResponseError(new URL(getCreationTransactionUrl), {
@@ -136,7 +140,7 @@ describe('Get creation transaction', () => {
     networkService.get.mockImplementation(({ url }) => {
       switch (url) {
         case getChainUrl:
-          return Promise.resolve({ data: chain, status: 200 });
+          return Promise.resolve({ data: rawify(chain), status: 200 });
         case getCreationTransactionUrl:
           return Promise.reject(new Error());
         default:
@@ -163,7 +167,7 @@ describe('Get creation transaction', () => {
           return Promise.reject(new Error());
         case getCreationTransactionUrl:
           return Promise.resolve({
-            data: creationTransactionToJson(creationTransaction),
+            data: rawify(creationTransactionToJson(creationTransaction)),
             status: 200,
           });
         default:

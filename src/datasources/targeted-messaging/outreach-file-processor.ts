@@ -12,18 +12,13 @@ import { ITargetedMessagingDatasource } from '@/domain/interfaces/targeted-messa
 import { Outreach } from '@/domain/targeted-messaging/entities/outreach.entity';
 import { ILoggingService, LoggingService } from '@/logging/logging.interface';
 import { asError } from '@/logging/utils';
-import {
-  Inject,
-  Injectable,
-  OnModuleDestroy,
-  type OnModuleInit,
-} from '@nestjs/common';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { readFile } from 'fs/promises';
 import path from 'path';
 
 @Injectable()
-export class OutreachFileProcessor implements OnModuleInit, OnModuleDestroy {
+export class OutreachFileProcessor implements OnModuleInit {
   private readonly storageType: FileStorageType;
   private readonly localBaseDir: string;
 
@@ -53,6 +48,10 @@ export class OutreachFileProcessor implements OnModuleInit, OnModuleDestroy {
         await this.cacheService.hSet(lockCacheDir, 'true', MAX_TTL);
         await this.processOutreachFiles();
       }
+    } catch (err) {
+      this.loggingService.error(
+        `Error processing outreach files: ${asError(err).message}`,
+      );
     } finally {
       await this.cacheService.deleteByKey(
         CacheRouter.getOutreachFileProcessorCacheKey(),
@@ -60,19 +59,19 @@ export class OutreachFileProcessor implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async onModuleDestroy(): Promise<void> {
-    await this.cacheService.deleteByKey(
-      CacheRouter.getOutreachFileProcessorCacheKey(),
-    );
-  }
-
   private async processOutreachFiles(): Promise<void> {
     const outreaches = await this.datasource.getUnprocessedOutreaches();
     for (const outreach of outreaches) {
-      this.loggingService.info(
-        `[Outreach ${outreach.id}] Processing outreach ${outreach.sourceId}`,
-      );
-      await this.processOutreach(outreach);
+      if (outreach.targetAll) {
+        this.loggingService.info(
+          `[Outreach ${outreach.id}] Targeting all safes. No file to process`,
+        );
+      } else {
+        this.loggingService.info(
+          `[Outreach ${outreach.id}] Processing outreach ${outreach.sourceId}`,
+        );
+        await this.processOutreach(outreach);
+      }
     }
   }
 

@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker/.';
-import { chunk } from 'lodash';
+import chunk from 'lodash/chunk';
 import { getAddress } from 'viem';
 import { chainBuilder } from '@/domain/chains/entities/__tests__/chain.builder';
 import {
@@ -13,6 +13,7 @@ import type { IConfigApi } from '@/domain/interfaces/config-api.interface';
 import type { ITransactionApiManager } from '@/domain/interfaces/transaction-api.manager.interface';
 import type { Page } from '@/domain/entities/page.entity';
 import type { ILoggingService } from '@/logging/logging.interface';
+import { type Raw, rawify } from '@/validation/entities/raw.entity';
 
 const mockLoggingService = {
   error: jest.fn(),
@@ -58,11 +59,11 @@ describe('ChainsRepository', () => {
 
   it('should return all chains across pages below request limit', async () => {
     const url = faker.internet.url({ appendSlash: true });
-    const chains = Array.from(
-      {
-        length: ChainsRepository.MAX_LIMIT * (maxSequentialPages - 1), // One page less than request limit
-      },
+    const chains = faker.helpers.multiple(
       (_, i) => chainBuilder().with('chainId', i.toString()).build(),
+      {
+        count: ChainsRepository.MAX_LIMIT * (maxSequentialPages - 1), // One page less than request limit
+      },
     );
     const pages = chunk(chains, ChainsRepository.MAX_LIMIT).map(
       (results, i, arr) => {
@@ -89,16 +90,18 @@ describe('ChainsRepository', () => {
           );
         })();
 
-        return pageBuilder<Chain>()
-          .with('results', results)
-          .with('count', chains.length)
-          .with('previous', previous)
-          .with('next', next)
-          .build();
+        return rawify(
+          pageBuilder<Chain>()
+            .with('results', results)
+            .with('count', chains.length)
+            .with('previous', previous)
+            .with('next', next)
+            .build(),
+        );
       },
     );
     mockConfigApi.getChains.mockImplementation(
-      ({ offset }): Promise<Page<Chain>> => {
+      ({ offset }): Promise<Raw<Page<Chain>>> => {
         if (offset === 0) {
           return Promise.resolve(pages[0]);
         }
@@ -135,11 +138,11 @@ describe('ChainsRepository', () => {
 
   it('should return all chains across pages up request limit', async () => {
     const url = faker.internet.url({ appendSlash: true });
-    const chains = Array.from(
-      {
-        length: ChainsRepository.MAX_LIMIT * maxSequentialPages, // Exactly request limit
-      },
+    const chains = faker.helpers.multiple(
       (_, i) => chainBuilder().with('chainId', i.toString()).build(),
+      {
+        count: ChainsRepository.MAX_LIMIT * maxSequentialPages, // Exactly request limit
+      },
     );
     const pages = chunk(chains, ChainsRepository.MAX_LIMIT).map(
       (results, i, arr) => {
@@ -166,16 +169,18 @@ describe('ChainsRepository', () => {
           );
         })();
 
-        return pageBuilder<Chain>()
-          .with('results', results)
-          .with('count', chains.length)
-          .with('previous', previous)
-          .with('next', next)
-          .build();
+        return rawify(
+          pageBuilder<Chain>()
+            .with('results', results)
+            .with('count', chains.length)
+            .with('previous', previous)
+            .with('next', next)
+            .build(),
+        );
       },
     );
     mockConfigApi.getChains.mockImplementation(
-      ({ offset }): Promise<Page<Chain>> => {
+      ({ offset }): Promise<Raw<Page<Chain>>> => {
         if (offset === 0) {
           return Promise.resolve(pages[0]);
         }
@@ -216,11 +221,11 @@ describe('ChainsRepository', () => {
 
   it('should return all chains across pages up to request limit and notify if there are more', async () => {
     const url = faker.internet.url({ appendSlash: true });
-    const chains = Array.from(
-      {
-        length: ChainsRepository.MAX_LIMIT * (maxSequentialPages + 1), // One page more than request limit
-      },
+    const chains = faker.helpers.multiple(
       (_, i) => chainBuilder().with('chainId', i.toString()).build(),
+      {
+        count: ChainsRepository.MAX_LIMIT * (maxSequentialPages + 1), // One page more than request limit
+      },
     );
     const pages = chunk(chains, ChainsRepository.MAX_LIMIT).map(
       (results, i, arr) => {
@@ -247,16 +252,18 @@ describe('ChainsRepository', () => {
           );
         })();
 
-        return pageBuilder<Chain>()
-          .with('results', results)
-          .with('count', chains.length)
-          .with('previous', previous)
-          .with('next', next)
-          .build();
+        return rawify(
+          pageBuilder<Chain>()
+            .with('results', results)
+            .with('count', chains.length)
+            .with('previous', previous)
+            .with('next', next)
+            .build(),
+        );
       },
     );
     mockConfigApi.getChains.mockImplementation(
-      ({ offset }): Promise<Page<Chain>> => {
+      ({ offset }): Promise<Raw<Page<Chain>>> => {
         if (offset === 0) {
           return Promise.resolve(pages[0]);
         }

@@ -13,8 +13,6 @@ import {
 
 @Injectable()
 export class PostgresDatabaseService {
-  private transactionManager?: EntityManager = undefined;
-
   public constructor(
     @Inject(LoggingService) private readonly loggingService: ILoggingService,
     @InjectDataSource()
@@ -46,8 +44,8 @@ export class PostgresDatabaseService {
    */
   public async initializeDatabaseConnection(): Promise<DataSource> {
     if (!this.isInitialized()) {
-      this.loggingService.info('PostgresDatabaseService initialized...');
       await this.dataSource.initialize();
+      this.loggingService.info('PostgresDatabaseService initialized...');
     }
 
     return this.dataSource;
@@ -60,8 +58,8 @@ export class PostgresDatabaseService {
    */
   public async destroyDatabaseConnection(): Promise<DataSource> {
     if (this.isInitialized()) {
-      this.loggingService.info('PostgresDatabaseService destroyed...');
       await this.dataSource.destroy();
+      this.loggingService.info('PostgresDatabaseService destroyed...');
     }
 
     return this.dataSource;
@@ -84,22 +82,13 @@ export class PostgresDatabaseService {
     return this.dataSource.getRepository<T>(entity);
   }
 
-  public async transaction(
-    callback: (transactionManager: EntityManager) => Promise<void>,
-  ): Promise<void> {
+  public async transaction<T>(
+    callback: (transactionManager: EntityManager) => Promise<T>,
+  ): Promise<T> {
     return this.dataSource.transaction(
-      async (transactionalEntityManager): Promise<void> => {
-        this.transactionManager = transactionalEntityManager;
-        await callback(this.transactionManager);
+      async (transactionalEntityManager: EntityManager): Promise<T> => {
+        return await callback(transactionalEntityManager);
       },
     );
-  }
-
-  public getTransactionRunner(): EntityManager {
-    if (!this.transactionManager) {
-      throw new Error('Query runner is not initialized...');
-    }
-
-    return this.transactionManager;
   }
 }

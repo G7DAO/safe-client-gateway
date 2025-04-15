@@ -32,6 +32,9 @@ import { TestPostgresDatabaseModule } from '@/datasources/db/__tests__/test.post
 import { PostgresDatabaseModule } from '@/datasources/db/v1/postgres-database.module';
 import { PostgresDatabaseModuleV2 } from '@/datasources/db/v2/postgres-database.module';
 import { TestPostgresDatabaseModuleV2 } from '@/datasources/db/v2/test.postgres-database.module';
+import { TestTargetedMessagingDatasourceModule } from '@/datasources/targeted-messaging/__tests__/test.targeted-messaging.datasource.module';
+import { TargetedMessagingDatasourceModule } from '@/datasources/targeted-messaging/targeted-messaging.datasource.module';
+import { rawify } from '@/validation/entities/raw.entity';
 
 describe('Delete Transaction - Transactions Controller (Unit', () => {
   let app: INestApplication<Server>;
@@ -47,6 +50,8 @@ describe('Delete Transaction - Transactions Controller (Unit', () => {
     })
       .overrideModule(PostgresDatabaseModule)
       .useModule(TestPostgresDatabaseModule)
+      .overrideModule(TargetedMessagingDatasourceModule)
+      .useModule(TestTargetedMessagingDatasourceModule)
       .overrideModule(CacheModule)
       .useModule(TestCacheModule)
       .overrideModule(RequestScopedLoggingModule)
@@ -104,13 +109,16 @@ describe('Delete Transaction - Transactions Controller (Unit', () => {
 
     networkService.get.mockImplementation(({ url }) => {
       if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-        return Promise.resolve({ data: chain, status: 200 });
+        return Promise.resolve({ data: rawify(chain), status: 200 });
       }
       if (
         url ===
         `${chain.transactionService}/api/v1/multisig-transactions/${tx.safeTxHash}/`
       ) {
-        return Promise.resolve({ data: multisigToJson(tx), status: 200 });
+        return Promise.resolve({
+          data: rawify(multisigToJson(tx)),
+          status: 200,
+        });
       }
       return Promise.reject(`No matching rule for url: ${url}`);
     });
@@ -119,7 +127,7 @@ describe('Delete Transaction - Transactions Controller (Unit', () => {
         url ===
         `${chain.transactionService}/api/v1/multisig-transactions/${tx.safeTxHash}`
       ) {
-        return Promise.resolve({ data: {}, status: 204 });
+        return Promise.resolve({ data: rawify({}), status: 204 });
       }
       return Promise.reject(`No matching rule for url: ${url}`);
     });
@@ -139,13 +147,16 @@ describe('Delete Transaction - Transactions Controller (Unit', () => {
 
     networkService.get.mockImplementation(({ url }) => {
       if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-        return Promise.resolve({ data: chain, status: 200 });
+        return Promise.resolve({ data: rawify(chain), status: 200 });
       }
       if (
         url ===
         `${chain.transactionService}/api/v1/multisig-transactions/${tx.safeTxHash}/`
       ) {
-        return Promise.resolve({ data: multisigToJson(tx), status: 200 });
+        return Promise.resolve({
+          data: rawify(multisigToJson(tx)),
+          status: 200,
+        });
       }
       return Promise.reject(`No matching rule for url: ${url}`);
     });
@@ -154,7 +165,7 @@ describe('Delete Transaction - Transactions Controller (Unit', () => {
         url ===
         `${chain.transactionService}/api/v1/multisig-transactions/${tx.safeTxHash}`
       ) {
-        return Promise.resolve({ data: {}, status: 204 });
+        return Promise.resolve({ data: rawify({}), status: 204 });
       }
       return Promise.reject(`No matching rule for url: ${url}`);
     });
@@ -188,13 +199,16 @@ describe('Delete Transaction - Transactions Controller (Unit', () => {
     const tx = multisigTransactionBuilder().build();
     networkService.get.mockImplementation(({ url }) => {
       if (url === `${safeConfigUrl}/api/v1/chains/${chain.chainId}`) {
-        return Promise.resolve({ data: chain, status: 200 });
+        return Promise.resolve({ data: rawify(chain), status: 200 });
       }
       if (
         url ===
         `${chain.transactionService}/api/v1/multisig-transactions/${tx.safeTxHash}/`
       ) {
-        return Promise.resolve({ data: multisigToJson(tx), status: 200 });
+        return Promise.resolve({
+          data: rawify(multisigToJson(tx)),
+          status: 200,
+        });
       }
       return Promise.reject(`No matching rule for url: ${url}`);
     });

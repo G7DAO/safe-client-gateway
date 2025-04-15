@@ -1,7 +1,9 @@
 import { TestDbFactory } from '@/__tests__/db.factory';
+import { waitMilliseconds } from '@/__tests__/util/retry';
 import { PostgresDatabaseMigrator } from '@/datasources/db/v1/postgres-database.migrator';
 import { faker } from '@faker-js/faker';
-import postgres, { Sql } from 'postgres';
+import type { Sql } from 'postgres';
+import type postgres from 'postgres';
 
 interface AccountRow {
   id: number;
@@ -26,8 +28,6 @@ describe('Migration 00001_accounts', () => {
   });
 
   it('runs successfully', async () => {
-    await sql`DROP TABLE IF EXISTS groups, accounts CASCADE;`;
-
     const result = await migrator.test({
       migration: '00001_accounts',
       after: async (sql: Sql) => {
@@ -69,8 +69,6 @@ describe('Migration 00001_accounts', () => {
   });
 
   it('should add and update row timestamps', async () => {
-    await sql`DROP TABLE IF EXISTS groups, accounts CASCADE;`;
-
     const result: {
       before: unknown;
       after: AccountRow[];
@@ -79,6 +77,8 @@ describe('Migration 00001_accounts', () => {
       after: async (sql: Sql): Promise<AccountRow[]> => {
         await sql`INSERT INTO groups (id) VALUES (1);`;
         await sql`INSERT INTO accounts (id, group_id, address) VALUES (1, 1, '0x0000');`;
+        // wait for 1 millisecond to ensure that the updated_at timestamp is different
+        await waitMilliseconds(1);
         await sql`UPDATE accounts set address = '0x0001' WHERE id = 1;`;
         return await sql<AccountRow[]>`SELECT * FROM accounts`;
       },
@@ -100,8 +100,6 @@ describe('Migration 00001_accounts', () => {
   });
 
   it('only updated_at should be updated on row changes', async () => {
-    await sql`DROP TABLE IF EXISTS groups, accounts CASCADE;`;
-
     const result: {
       before: unknown;
       after: AccountRow[];
@@ -119,6 +117,8 @@ describe('Migration 00001_accounts', () => {
     const updatedAt = new Date(result.after[0].updated_at);
     expect(createdAt).toStrictEqual(updatedAt);
 
+    // wait for 1 millisecond to ensure that the updated_at timestamp is different
+    await waitMilliseconds(1);
     // only updated_at should be updated after the row is updated
     await sql`UPDATE accounts set address = '0x0001' WHERE id = 1;`;
     const afterUpdate = await sql<AccountRow[]>`SELECT * FROM accounts`;
