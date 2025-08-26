@@ -544,8 +544,9 @@ export default () => ({
         // For reference, these environment variables should be present in the environment,
         // but they are not transferred to the memory/configuration file:
         // AWS_REGION
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'random-access-key', // Should be overridden by the environment
+        secretAccessKey:
+          process.env.AWS_SECRET_ACCESS_KEY || 'random-secret-key', // Should be overridden by the environment
         bucketName:
           process.env.AWS_STORAGE_BUCKET_NAME || 'safe-client-gateway',
         basePath: process.env.AWS_S3_BASE_PATH || 'assets/targeted-messaging',
@@ -568,8 +569,9 @@ export default () => ({
         // For reference, these environment variables should be present in the environment,
         // but they are not transferred to the memory/configuration file:
         // AWS_REGION
-        accessKeyId: process.env.CSV_AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.CSV_AWS_SECRET_ACCESS_KEY,
+        accessKeyId: process.env.CSV_AWS_ACCESS_KEY_ID || 'random-access-key', // Should be overridden by the environment
+        secretAccessKey:
+          process.env.CSV_AWS_SECRET_ACCESS_KEY || 'random-secret-key', // Should be overridden by the environment
         bucketName:
           process.env.CSV_AWS_STORAGE_BUCKET_NAME || 'safe-client-gateway',
         basePath: process.env.CSV_AWS_S3_BASE_PATH || 'assets/csv-export',
