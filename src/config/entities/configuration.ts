@@ -157,7 +157,10 @@ export default () => ({
   },
   bridge: {
     baseUri: 'https://li.quest',
-    apiKey: process.env.BRIDGE_API_KEY,
+    // https://docs.li.fi/api-reference/introduction#authentication
+    // All LI.FI APIs do not require API key. API key is only needed for higher rate limits
+    // Assign a proper API key to avoid rate limits on production
+    apiKey: process.env.BRIDGE_API_KEY || 'random-api-key',
   },
   contracts: {
     trustedForDelegateCall: {
